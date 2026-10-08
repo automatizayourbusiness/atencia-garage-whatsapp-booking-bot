@@ -1,0 +1,1124 @@
+{
+  "name": "Bot Atencia Garage",
+  "nodes": [
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usa esta herramienta solo si necesitas consultar eventos ya registrados en el calendario. OBLIGATORIO enviar 'inicio' y 'fin' con el formato exacto YYYY-MM-DDTHH:mm:ss-03:00. Nota: el lavadero atiende por orden de llegada y no limita cupos.",
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "56588acfec2995cf53a59cf669888c6bb229929f1c1b527a1a379cbaf92f85c4@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Atencia Garage"
+        },
+        "returnAll": true,
+        "options": {
+          "timeMin": "={{ $fromAI(\"inicio\", \"fecha y hora de inicio\", \"string\") }}",
+          "timeMax": "={{ $fromAI(\"fin\", \"fecha y hora de fin\", \"string\") }}",
+          "singleEvents": true
+        }
+      },
+      "id": "7ac4b823-68e7-4c10-ad57-98d7a0f40ec0",
+      "name": "Calendar_Disponibilidad",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.2,
+      "position": [
+        -1168,
+        2736
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "h4xpWTwyPLJxBF2g",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "OBLIGATORIO USAR ESTA HERRAMIENTA CUANDO SE DEFINE EL HORARIO EN QUE EL CLIENTE TRAERÁ EL VEHÍCULO. No respondas con texto, usa esta herramienta inmediatamente para guardar los datos en el calendario. Requiere 'inicio', 'fin', 'titulo' y 'descripcion'.",
+        "calendar": {
+          "__rl": true,
+          "value": "56588acfec2995cf53a59cf669888c6bb229929f1c1b527a1a379cbaf92f85c4@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Atencia Garage"
+        },
+        "start": "={{ $fromAI('inicio', 'Formato EXACTO: YYYY-MM-DDTHH:mm:ss-03:00', 'string') }}",
+        "end": "={{ $fromAI(\"fin\", \"fecha y hora de fin\", \"string\") }}",
+        "additionalFields": {
+          "description": "={{ $fromAI('descripcion', 'Detalle de la visita, servicio y telefono (orden de llegada)', 'string') }}",
+          "summary": "={{ $fromAI('titulo', 'Nombre Cliente - Vehiculo', 'string') }}"
+        }
+      },
+      "id": "ddb45fa3-93b1-4275-9e9f-10d46146b25a",
+      "name": "Calendar_Agendar",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.2,
+      "position": [
+        -1040,
+        2736
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "h4xpWTwyPLJxBF2g",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usa esta herramienta para buscar registros de visita por texto (nombre cliente o teléfono) para Modificar el horario o Borrar.",
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "56588acfec2995cf53a59cf669888c6bb229929f1c1b527a1a379cbaf92f85c4@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Atencia Garage"
+        },
+        "returnAll": true,
+        "options": {
+          "query": "={{ $fromAI('busqueda', 'Texto a buscar (nombre o telefono)', 'string') }}"
+        }
+      },
+      "id": "dd402462-86a0-45f7-946e-053126c54ac8",
+      "name": "Calendar_Gestionar",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.2,
+      "position": [
+        -912,
+        2736
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "h4xpWTwyPLJxBF2g",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Usa esta herramienta para borrar un evento.",
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "56588acfec2995cf53a59cf669888c6bb229929f1c1b527a1a379cbaf92f85c4@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Atencia Garage"
+        },
+        "eventId": "={{ $fromAI('id_evento', 'El ID del evento a borrar', 'string') }}",
+        "options": {}
+      },
+      "id": "77c22bc4-1740-4a66-88f8-460df89635a3",
+      "name": "Calendar_Borrar",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.2,
+      "position": [
+        -784,
+        2736
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "h4xpWTwyPLJxBF2g",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const data = $input.item.json;\n\n// Al usar un webhook normal, n8n mete todo adentro de \"body\"\nconst webhookBody = data.body || data;\n\n// WAHA envía la información principal dentro de 'payload'\nconst payload = webhookBody.payload || webhookBody;\n\n// Evitar procesar mensajes que el bot (o tú mismo) envía (fromMe = true)\nif (!payload || payload.fromMe === true) {\n  return null; \n}\n\n// Extraer el texto del mensaje\nlet message_text = payload.body || '';\nconst msgType = payload.type || '';\n\n// Si es un formato de voz, o si directamente no tiene texto (audio, imagen, sticker), \n// lo marcamos como audio para que el cortafuegos lo ataje más adelante.\nlet is_audio = false;\nif (msgType === 'ptt' || msgType === 'audio' || msgType === 'voice' || payload.hasMedia || !message_text || message_text.trim() === '') {\n    is_audio = true;\n    message_text = ''; // Nos aseguramos de que el texto quede limpio\n}\n\n// 1. Extraer el número base\nlet phoneRaw = payload.from || '';\n\n// 2. Si viene con @lid, buscamos el número real en SenderAlt\nif (phoneRaw.includes('@lid') && payload['_data'] && payload['_data']['Info'] && payload['_data']['Info']['SenderAlt']) {\n    phoneRaw = payload['_data']['Info']['SenderAlt'];\n}\n\n// 3. Limpiar CUALQUIER sufijo usando una expresión regular\nconst phone = phoneRaw.replace(/@c\\.us|@s\\.whatsapp\\.net|@lid/g, '');\n\n// Extraer el nombre del cliente\nlet name = 'Cliente';\nif (payload['_data'] && payload['_data']['notifyName']) {\n  name = payload['_data']['notifyName'];\n} else if (payload['notifyName']) {\n  name = payload['notifyName'];\n}\n\nreturn {\n  json: {\n    message_received: message_text,\n    phone_number: phone,\n    user_name: name,\n    is_audio: is_audio // Viaja directo al cortafuegos\n  }\n};"
+      },
+      "id": "31df1a8a-4154-463c-9c90-fa342b0fb48d",
+      "name": "Extraer Datos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3024,
+        2512
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "16qQNcCneRA-4Q9y8mdp2puXs-UWgHGvieB18AlzKGgw",
+          "mode": "list",
+          "cachedResultName": "Turnos Lavadero",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qQNcCneRA-4Q9y8mdp2puXs-UWgHGvieB18AlzKGgw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1399078881,
+          "mode": "list",
+          "cachedResultName": "Lista Negra",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qQNcCneRA-4Q9y8mdp2puXs-UWgHGvieB18AlzKGgw/edit#gid=1399078881"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Telefono",
+              "lookupValue": "={{ $json.phone_number }}"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": true
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -2656,
+        2512
+      ],
+      "id": "30f630e1-08c4-45d6-b00a-50151fa03636",
+      "name": "Buscar Lista Negra",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "EtkO9naWh6ZQkkuy",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "eval-blacklist",
+              "leftValue": "={{ !!$json.Telefono }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c5b890ad-eff8-442f-8b3a-391edd593062",
+      "name": "¿Es Lista Negra?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -2464,
+        2512
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "16qQNcCneRA-4Q9y8mdp2puXs-UWgHGvieB18AlzKGgw",
+          "mode": "list",
+          "cachedResultName": "Turnos Lavadero",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qQNcCneRA-4Q9y8mdp2puXs-UWgHGvieB18AlzKGgw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1749186312,
+          "mode": "list",
+          "cachedResultName": "Sesiones",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qQNcCneRA-4Q9y8mdp2puXs-UWgHGvieB18AlzKGgw/edit#gid=1749186312"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Telefono",
+              "lookupValue": "={{ $('Extraer Datos').first().json.phone_number }}"
+            }
+          ]
+        },
+        "options": {
+          "returnFirstMatch": true
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -2304,
+        2512
+      ],
+      "id": "7b94aa97-819f-49bb-a15a-8c96abfb642f",
+      "name": "Get row(s) in sheet",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "EtkO9naWh6ZQkkuy",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "a6b16f08-8cc1-4322-a16d-7643773ac076",
+              "leftValue": true,
+              "rightValue": "={{ $node[\"Get row(s) in sheet\"].json[\"Estado\"] == 'agendando' || /\\b(turno|turnito|lavado|lavar|servicios|servicio|mecánica|mecanica|cancelar|modificar|horario|horarios|traer|llevar|auto|camioneta|vehiculo)\\b/i.test($node[\"Extraer Datos\"].json[\"message_received\"]) }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bc6b373d-58da-43ad-8943-252b6bde0bda",
+      "name": "Validar Flujo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -2144,
+        2512
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "16qQNcCneRA-4Q9y8mdp2puXs-UWgHGvieB18AlzKGgw",
+          "mode": "list",
+          "cachedResultName": "Turnos Lavadero",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qQNcCneRA-4Q9y8mdp2puXs-UWgHGvieB18AlzKGgw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1749186312,
+          "mode": "list",
+          "cachedResultName": "Sesiones",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qQNcCneRA-4Q9y8mdp2puXs-UWgHGvieB18AlzKGgw/edit#gid=1749186312"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Estado": "agendando",
+            "Telefono": "={{ $('Extraer Datos').item.json.phone_number }}",
+            "UltimaVez": "={{ $now }}"
+          },
+          "matchingColumns": [
+            "Telefono"
+          ],
+          "schema": [
+            {
+              "id": "Telefono",
+              "displayName": "Telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Estado",
+              "displayName": "Estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "UltimaVez",
+              "displayName": "UltimaVez",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1952,
+        2496
+      ],
+      "id": "713087af-fcca-4e57-bb28-fb5b97f9d244",
+      "name": "Append or update row in sheet",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "EtkO9naWh6ZQkkuy",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "847e9a3b-5542-454a-a9f5-b310f9f5c35a",
+              "name": "message_received",
+              "value": "={{ $('Extraer Datos').item.json.message_received }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1808,
+        2496
+      ],
+      "id": "2faa9a11-8240-4677-9843-32e2df1daf0c",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message_received }}",
+        "options": {
+          "systemMessage": "=Eres el asistente virtual de \"Atencia Garage\". Actúas ESTRICTAMENTE como un MOTOR DE EJECUCIÓN SECUENCIAL para coordinar la llegada de vehículos y registrarlos en el calendario.\n\n<regla_absoluta_critica>\n- NUNCA INVENTES INFORMACIÓN.\n- ¡REGLA FUNDAMENTAL!: El lavadero YA NO SE MANEJA POR TURNOS. Queda ESTRICTAMENTE PROHIBIDO usar la palabra \"turno\", decir que \"agendas un turno\", \"reservas un turno\" o que \"no hay turnos disponibles\".\n- En su lugar, debes consultar a qué horario va a traer el vehículo el cliente y registrarlo en el calendario para esperarlo a esa hora.\n- Aclara SIEMPRE al cliente que a esa hora lo esperamos, pero que la ATENCIÓN Y PRIORIDAD ES POR ORDEN DE LLEGADA al local.\n- Si una herramienta no respondió todavía, TIENES PROHIBIDO asumir un resultado. Espera su confirmación.\n</regla_absoluta_critica>\n\n<configuracion_base>\n- IDIOMA: ESPAÑOL (Argentina).\n- TONO: Ultra conciso, directo y amable.\n- REGLA DE AVANCE: Tu única forma de avanzar en el flujo es completando la condición de salida del paso actual.\n</configuracion_base>\n\n<manejo_de_errores>\nSi cualquier herramienta devuelve ERROR:\n1. NO continúes con el flujo.\n2. NO ejecutes la siguiente herramienta.\n3. Informa al usuario que ocurrió un problema técnico y que intente nuevamente en unos minutos.\n4. NUNCA asumas que el registro existe o no existe.\n</manejo_de_errores>\n\n<contexto_actual>\n- TELÉFONO: {{ $('Extraer Datos').item.json.phone_number }}\n- NOMBRE: {{ $('Extraer Datos').item.json.user_name }}\n- HOY ES: {{ $now.setZone('America/Argentina/Mendoza').toFormat('dd/MM/yyyy (cccc)') }}\n- HORARIOS DE ATENCIÓN: Lunes a Sábados de 09:00 a 18:30 hs. (Domingos cerrado).\n- DISPONIBILIDAD: Al manejarse por orden de llegada, NO existen cupos cerrados ni turnos limitados. Cualquier horario dentro de Lunes a Sábados de 09:00 a 18:30 hs es aceptado. No rechaces horarios dentro de esa franja.\n- PRECIOS: Auto: $22.000 | SUV: $24.000 | Camioneta: $26.000 | Moto: $10.000\n- SERVICIOS: Lavadero (Completo, Tapizados, Pulidos) y Lubricentro.\n</contexto_actual>\n\n🛠️ <flujo_de_ejecucion>\nPASO 1: CONSULTA DE HORARIO Y DATOS\n- Condición: El cliente consulta por lavado, servicios, precios o quiere traer su vehículo.\n- Acción: Si el cliente aún no indicó Fecha, Hora estimada, Tipo de Vehículo o Servicio, pregúntale amablemente a qué horario planea traer el vehículo y solicita los datos faltantes.\n- Horarios válidos: Lunes a Sábados de 09:00 a 18:30 hs. Si pide fuera de este rango o un domingo, infórmale amablemente el horario de atención del local y pídele un horario dentro de esa franja.\n- Transición: Cuando tengas Fecha, Hora, Vehículo y Servicio confirmados, avanzar de inmediato al PASO 2.\n\nPASO 2: EJECUCIÓN ESTRICTA (BLOQUEO DE TEXTO)\n- Condición: El cliente indicó a qué horario traerá el vehículo Y tienes los datos de Vehículo y Servicio.\n- Lógica de Seguridad: En este paso TU ÚNICA SALIDA VÁLIDA es ejecutar la herramienta `Calendar_Agendar` para guardar el registro en el calendario/dashboard.\n- Parámetros a enviar:\n  * inicio: YYYY-MM-DDTHH:mm:ss-03:00 (fecha y hora exacta en que el cliente traerá el vehículo).\n  * fin: +29 min exactos del inicio (ej: inicio T10:00:00-03:00 -> fin T10:29:00-03:00).\n  * titulo: [Nombre] - [Vehiculo]\n  * descripcion: Tel: {{ $('Extraer Datos').item.json.phone_number }} - Servicio: [Servicio] (Orden de llegada)\n- REGLA DE ORO: NO emitas ningún mensaje conversacional mientras llamas a la herramienta. Responde ÚNICAMENTE con el llamado a la herramienta.\n- Transición: Avanzar al PASO 3 cuando la herramienta devuelva éxito (ID de evento).\n\nPASO 3: CONFIRMACIÓN FINAL\n- Condición: `Calendar_Agendar` devolvió un ID de evento exitoso.\n- Acción: Responder al cliente:\n  \"¡Excelente [Nombre]! Te esperamos el [Fecha] a las [Hora] con tu [Vehículo] para el servicio de [Servicio]. ⚠️ Recordá que nos manejamos por orden de llegada, por lo que a esa hora te esperamos pero la prioridad de atención es según el orden de llegada en el local. ¡Nos vemos! y seguimos en contacto.\"\n- REGLA CRÍTICA: Debe incluir obligatoriamente la frase \"seguimos en contacto\" al final.\n- Transición: Fin del flujo.\n</flujo_de_ejecucion>\n\n🛠️ <flujos_secundarios>\nFLUJO MODIFICAR HORARIO:\n- Condición: El cliente pide cambiar el horario o día en que traerá el vehículo.\n- FASE 1: Ejecutar `Calendar_Gestionar` (para buscar el ID del registro anterior por nombre o teléfono).\n- FASE 2: Ejecutar `Calendar_Borrar` (eliminar el ID viejo).\n- FASE 3: Ejecutar `Calendar_Agendar` (registrar el nuevo horario).\n- Cierre: \"¡Listo [Nombre]! Modificamos tu horario: te esperamos el [Nueva Fecha] a las [Nueva Hora]. ⚠️ Recordá que la prioridad de atención es por orden de llegada en el local. ¡Nos vemos! y seguimos en contacto.\"\n\nFLUJO CANCELAR VISITA:\n- Condición: El cliente avisa que no podrá traer el vehículo.\n- FASE 1: Ejecutar `Calendar_Gestionar` para buscar el registro.\n- FASE 2: Ejecutar `Calendar_Borrar`.\n- Cierre: \"Entendido [Nombre], cancelamos el aviso. ¡Muchas gracias por avisarnos! y seguimos en contacto.\"\n</flujos_secundarios>"
+        }
+      },
+      "id": "d54675d2-6bea-443c-b25a-d1e3f4f3b996",
+      "name": "Agente IA Atencia",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [
+        -1104,
+        2496
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Extraer Datos').first().json.phone_number || 'cliente_prueba' }}",
+        "contextWindowLength": 10
+      },
+      "id": "3cedff5d-c674-4157-812c-2870f0e09708",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.2,
+      "position": [
+        -1296,
+        2736
+      ]
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.floor(Math.random() * (5 - 2 + 1)) + 5 }}"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -448,
+        2512
+      ],
+      "id": "2a9985b0-01c6-496c-aadc-8f09fba123a7",
+      "name": "Wait",
+      "webhookId": "42ff4a24-c432-4964-ac03-2e932d8018dd"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bc49ff8b-6e71-4e61-9a61-8b06c99f955b",
+              "leftValue": "={{ $node[\"Agente IA Atencia\"].json.output }}",
+              "rightValue": "/seguimos en contacto/i",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d44302a7-1dfd-40ce-a2b5-c8abbd9ab045",
+      "name": "Detectar Fin",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        2512
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "16qQNcCneRA-4Q9y8mdp2puXs-UWgHGvieB18AlzKGgw",
+          "mode": "list",
+          "cachedResultName": "Turnos Lavadero",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qQNcCneRA-4Q9y8mdp2puXs-UWgHGvieB18AlzKGgw/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1749186312,
+          "mode": "list",
+          "cachedResultName": "Sesiones",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16qQNcCneRA-4Q9y8mdp2puXs-UWgHGvieB18AlzKGgw/edit#gid=1749186312"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Estado": "finalizado",
+            "Telefono": "={{ $('Extraer Datos').first().json.phone_number }}",
+            "row_number": 0,
+            "UltimaVez": "={{ $now }}"
+          },
+          "matchingColumns": [
+            "Telefono"
+          ],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "2fe5f54b-66d4-48a8-8ae1-96d5638439c7",
+      "name": "Cerrar Sesion",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        0,
+        2432
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "EtkO9naWh6ZQkkuy",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst phone = $input.first().json.phone_number;\nconst timeNow = new Date().getTime();\n\n// 5000 milisegundos = 5 segundos de \"escudo\". Podés subirlo si querés.\nconst tiempoBloqueo = 10000; \nlet esSpam = false;\n\nif (staticData[phone] && (timeNow - staticData[phone]) < tiempoBloqueo) {\n    esSpam = true; // Llegó muy rápido, lo marcamos como spam\n} else {\n    staticData[phone] = timeNow; // Es válido, guardamos la hora\n}\n\n// Pasamos todos los datos originales y sumamos nuestra alerta de spam\nreturn {\n  json: {\n    ...$input.first().json,\n    es_spam: esSpam\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2880,
+        2208
+      ],
+      "id": "e87251b1-a51e-4f12-afa5-2dbb1f61e33c",
+      "name": "Filtro Anti-Spam"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "67514206-8965-487a-b833-999b9571ad1d",
+              "leftValue": "={{ $json.es_spam }}",
+              "rightValue": "false",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2800,
+        2736
+      ],
+      "id": "2e5d836d-b067-4358-9ada-cbf49c6d0ff8",
+      "name": "¿Es Spam?"
+    },
+    {
+      "parameters": {
+        "resource": "Chatting",
+        "operation": "Send Text",
+        "session": "atenciagarage1",
+        "chatId": "={{ $('Extraer Datos').item.json.phone_number }}",
+        "reply_to": "=",
+        "text": "={{($node['Agente IA Atencia'].json.output) }}",
+        "requestOptions": {}
+      },
+      "type": "@devlikeapro/n8n-nodes-waha.WAHA",
+      "typeVersion": 202502,
+      "position": [
+        256,
+        2528
+      ],
+      "id": "0259376d-7236-4922-b834-50ccd96be36c",
+      "name": "Send a text message",
+      "credentials": {
+        "wahaApi": {
+          "id": "GYSo4Xm5laSP0rSq",
+          "name": "WAHA account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "lavadero_turnos",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "telefono",
+              "fieldValue": "={{ $('Extraer Datos').item.json.phone_number }}"
+            },
+            {
+              "fieldId": "estado",
+              "fieldValue": "finalizado"
+            },
+            {
+              "fieldId": "cliente",
+              "fieldValue": "={{ $('Extraer Datos').item.json.user_name }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        256,
+        2352
+      ],
+      "id": "a7edb843-ef73-44de-a5bc-c25bee7ec38d",
+      "name": "Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "hGg5dGe2Cm1YUsRx",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-chat-v3.1",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -1472,
+        2736
+      ],
+      "id": "63bb23c9-0eba-4ee2-a998-d5e70d9fcd3f",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "ssWYUkUoIvPLQbfo",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a27c0f6c-82d2-4109-8095-b1c8423874f2",
+              "leftValue": "={{ \n(() => {\n    // 1. Verificamos si va directo al grano (Regex para detectar días u horas)\n    const msg = $('Extraer Datos').item.json.message_received.toLowerCase();\n    const vaDirectoAlGrano = /\\b(hoy|mañana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|\\d{1,2}[:.]?\\d{0,2}\\s*(hs|hrs|horas|am|pm)?)\\b/i.test(msg);\n    \n    // Si va directo al grano, mandamos TRUE para que vaya directo al Agente IA (saltea bienvenida)\n    if (vaDirectoAlGrano) return true;\n\n    // 2. Verificamos la regla de las 48 horas usando la fecha de la sesión guardada\n    const ultimaVez = $node[\"Get row(s) in sheet\"].json[\"UltimaVez\"];\n    if (ultimaVez) {\n        // Luxon viene integrado nativo en n8n\n        const fechaSesion = DateTime.fromISO(ultimaVez);\n        const horasPasadas = $now.diff(fechaSesion, 'hours').hours;\n        \n        // Si pasaron menos de 48 horas, mandamos TRUE (saltea bienvenida)\n        if (horasPasadas < 48) return true;\n    }\n\n    // Si no dijo ningún horario y pasaron más de 48 hs (o es cliente nuevo), FALSE (Manda bienvenida)\n    return false;\n})() \n}}",
+              "rightValue": "agendando",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1392,
+        2496
+      ],
+      "id": "0fea0caa-44f4-432a-b626-3949e9f02175",
+      "name": "Es primera vez?"
+    },
+    {
+      "parameters": {
+        "resource": "Chatting",
+        "operation": "Send Text",
+        "session": "atenciagarage1",
+        "chatId": "={{ $('Extraer Datos').item.json.phone_number }}",
+        "text": "¡Hola! 👋 Soy el asistente virtual de Atencia Garage.\n\n🚗 Te informamos que nos manejamos por orden de llegada.\n\nPara coordinar y saber a qué hora esperarte, por favor indícame a qué horario vas a traer el vehículo, junto con:\n- Nombre\n- Fecha\n- Vehículo (Auto, SUV, Camioneta, Moto)\n- Servicio que necesitas\n\n🕒 Horarios de atención: Lun a Sáb | 09:00 a 18:30 hs.\n📍 Ubicación: Calle Juan Domingo Perón 945 (Búscanos en Google Maps).",
+        "requestOptions": {}
+      },
+      "type": "@devlikeapro/n8n-nodes-waha.WAHA",
+      "typeVersion": 202502,
+      "position": [
+        -992,
+        2288
+      ],
+      "id": "6c231950-38b1-45f4-b67a-afc03e745974",
+      "name": "Mensaje Bienvenida",
+      "credentials": {
+        "wahaApi": {
+          "id": "GYSo4Xm5laSP0rSq",
+          "name": "WAHA account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.floor(Math.random() * (5 - 2 + 1)) + 5 }}"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1200,
+        2288
+      ],
+      "id": "c4f3964c-eed1-4494-a457-49843ebf9dd6",
+      "name": "Wait1",
+      "webhookId": "544c4964-5dce-4c1a-ab95-f10e33ce8679"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1d59f1b8-1c75-4ebe-a78b-239a1af87357",
+              "leftValue": "={{ $('Extraer Datos').item.json.is_audio }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1632,
+        2496
+      ],
+      "id": "28806ac8-721a-4b35-9614-4444b80ba018",
+      "name": "Es audio?"
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.floor(Math.random() * (5 - 2 + 1)) + 5 }}"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1200,
+        2096
+      ],
+      "id": "050f8226-cab4-482c-8bc1-1213f11566eb",
+      "name": "Wait2",
+      "webhookId": "7b06523c-a44d-40f4-9665-5fdcb16706d9"
+    },
+    {
+      "parameters": {
+        "resource": "Chatting",
+        "operation": "Send Text",
+        "session": "=atenciagarage1",
+        "chatId": "={{ $('Extraer Datos').item.json.phone_number }}",
+        "text": "Lo siento, no puedo escuchar audios. Por favor, indícame por escrito a qué horario vas a traer el vehículo (junto con tu nombre, fecha, vehículo y servicio) para poder anotarlo. Recordá que la prioridad es por orden de llegada.",
+        "requestOptions": {}
+      },
+      "type": "@devlikeapro/n8n-nodes-waha.WAHA",
+      "typeVersion": 202502,
+      "position": [
+        -992,
+        2096
+      ],
+      "id": "5c16fc80-7205-42eb-b9d2-194090c97b6b",
+      "name": "Mandar mensaje de Audio",
+      "credentials": {
+        "wahaApi": {
+          "id": "GYSo4Xm5laSP0rSq",
+          "name": "WAHA account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "805e7747-a442-4081-a3d8-0860c04ad3f2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -3280,
+        2528
+      ],
+      "id": "1e58d788-c219-45a0-ae50-b910df3b5a90",
+      "name": "Webhook",
+      "webhookId": "805e7747-a442-4081-a3d8-0860c04ad3f2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Extraer Datos": {
+      "main": [
+        [
+          {
+            "node": "Filtro Anti-Spam",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Lista Negra": {
+      "main": [
+        [
+          {
+            "node": "¿Es Lista Negra?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es Lista Negra?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Validar Flujo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Flujo": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar_Disponibilidad": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente IA Atencia",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar_Agendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente IA Atencia",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar_Gestionar": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente IA Atencia",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar_Borrar": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente IA Atencia",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Es audio?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agente IA Atencia",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente IA Atencia": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Detectar Fin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar Fin": {
+      "main": [
+        [
+          {
+            "node": "Cerrar Sesion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cerrar Sesion": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro Anti-Spam": {
+      "main": [
+        [
+          {
+            "node": "¿Es Spam?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es Spam?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Lista Negra",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agente IA Atencia",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es primera vez?": {
+      "main": [
+        [
+          {
+            "node": "Agente IA Atencia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Mensaje Bienvenida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es audio?": {
+      "main": [
+        [
+          {
+            "node": "Wait2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Es primera vez?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait2": {
+      "main": [
+        [
+          {
+            "node": "Mandar mensaje de Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extraer Datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "America/Argentina/Buenos_Aires",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "569cdda2-a4b3-4c27-952e-3199ebe497f1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "881857ae2c41414af8a2a57ac10de026497eedad39fb4e88234101802415c1af"
+  },
+  "id": "y5gcEPVRdaLEEyvz",
+  "tags": []
+}
